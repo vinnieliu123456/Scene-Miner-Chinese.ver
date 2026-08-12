@@ -1,1 +1,0 @@
-# Scene-Minor-Chinese.ver
