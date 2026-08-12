@@ -1,0 +1,1925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene-Miner 智驾长尾危险场景挖掘平台</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+/* ========== 全局重置 ========== */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --primary:#3b6cf6;
+  --primary-light:#e8f0ff;
+  --primary-dark:#2b4fd4;
+  --bg:#f0f2f7;
+  --card:#ffffff;
+  --text-1:#1a1f36;
+  --text-2:#5c6378;
+  --text-3:#9ca3af;
+  --border:#e4e7ed;
+  --border-light:#f0f1f5;
+  --sidebar-bg:#1c2536;
+  --sidebar-active:#3b6cf6;
+  --risk-high:#ef4444;
+  --risk-high-bg:#fef2f2;
+  --risk-mid:#f59e0b;
+  --risk-mid-bg:#fffbeb;
+  --risk-low:#22c55e;
+  --risk-low-bg:#f0fdf4;
+  --radius:10px;
+  --radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.12);
+  --transition:.2s cubic-bezier(.4,0,.2,1);
+}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text-1);
+  font-size:14px;
+  line-height:1.6;
+  overflow:hidden;
+}
+a{text-decoration:none;color:inherit;}
+button{font-family:inherit;cursor:pointer;border:none;outline:none;}
+input,select{font-family:inherit;outline:none;}
+
+/* ========== 滚动条 ========== */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:#9ca3af;}
+
+/* ========== 侧边栏 ========== */
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;
+  width:224px;
+  background:var(--sidebar-bg);
+  z-index:100;
+  display:flex;flex-direction:column;
+  transition:width var(--transition);
+}
+.sidebar-logo{
+  height:60px;
+  display:flex;align-items:center;gap:10px;
+  padding:0 22px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  flex-shrink:0;
+}
+.sidebar-logo .logo-icon{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,#4f8bff,#3b6cf6);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:#fff;
+  flex-shrink:0;
+}
+.sidebar-logo .logo-text{
+  color:#fff;font-size:16px;font-weight:700;letter-spacing:.3px;
+  white-space:nowrap;overflow:hidden;
+}
+.sidebar-menu{
+  flex:1;overflow-y:auto;
+  padding:12px 0;
+}
+.sidebar-menu::-webkit-scrollbar{width:0;}
+.menu-group-label{
+  padding:16px 22px 6px;
+  font-size:11px;
+  color:#5a6a82;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-weight:600;
+}
+.menu-item{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 22px;
+  color:#9faebc;
+  font-size:14px;
+  cursor:pointer;
+  transition:all var(--transition);
+  border-left:3px solid transparent;
+  position:relative;
+}
+.menu-item:hover{
+  color:#fff;
+  background:rgba(255,255,255,.05);
+}
+.menu-item.active{
+  color:#fff;
+  background:rgba(59,108,246,.15);
+  border-left-color:var(--sidebar-active);
+}
+.menu-item .mi-icon{
+  width:20px;height:20px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  font-size:17px;
+}
+.menu-item .mi-badge{
+  margin-left:auto;
+  background:var(--risk-high);
+  color:#fff;
+  font-size:10px;
+  padding:1px 6px;
+  border-radius:10px;
+  font-weight:600;
+}
+.sidebar-footer{
+  padding:16px 22px;
+  border-top:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;gap:10px;
+  flex-shrink:0;
+}
+.sidebar-footer .avatar{
+  width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,#4f8bff,#6366f1);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:13px;font-weight:600;
+  flex-shrink:0;
+}
+.sidebar-footer .user-info{flex:1;min-width:0;}
+.sidebar-footer .user-name{color:#e2e8f0;font-size:13px;font-weight:500;}
+.sidebar-footer .user-role{color:#64748b;font-size:11px;}
+
+/* ========== 主区域 ========== */
+.main-wrapper{
+  margin-left:224px;
+  height:100vh;
+  display:flex;flex-direction:column;
+  transition:margin-left var(--transition);
+}
+
+/* ========== 顶部导航 ========== */
+.topbar{
+  height:60px;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 24px;
+  flex-shrink:0;
+  gap:16px;
+}
+.topbar .breadcrumb{
+  display:flex;align-items:center;gap:8px;
+  color:var(--text-2);font-size:14px;
+}
+.topbar .breadcrumb .bc-current{color:var(--text-1);font-weight:600;}
+.topbar .bc-sep{color:var(--text-3);}
+.topbar-right{
+  margin-left:auto;
+  display:flex;align-items:center;gap:18px;
+}
+.topbar-icon-btn{
+  width:36px;height:36px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-2);font-size:18px;
+  background:transparent;
+  transition:all var(--transition);
+  position:relative;
+}
+.topbar-icon-btn:hover{background:var(--bg);color:var(--text-1);}
+.topbar-icon-btn .dot{
+  position:absolute;top:8px;right:9px;
+  width:8px;height:8px;background:var(--risk-high);
+  border:2px solid #fff;border-radius:50%;
+}
+.topbar-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg);
+  border-radius:8px;
+  padding:0 12px;
+  height:36px;
+  width:240px;
+}
+.topbar-search input{
+  border:none;background:transparent;flex:1;
+  font-size:13px;color:var(--text-1);
+}
+.topbar-search input::placeholder{color:var(--text-3);}
+.topbar-search .ts-icon{color:var(--text-3);font-size:15px;}
+
+/* ========== 内容区 ========== */
+.content-area{
+  flex:1;
+  overflow-y:auto;
+  padding:24px;
+}
+.page{display:none;}
+.page.active{display:block;animation:fadeIn .25s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+.page-title{
+  font-size:22px;font-weight:700;color:var(--text-1);
+  margin-bottom:4px;
+}
+.page-subtitle{
+  font-size:13px;color:var(--text-2);
+  margin-bottom:24px;
+}
+
+/* ========== 统计卡片 ========== */
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px;
+  margin-bottom:24px;
+}
+.stat-card{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:20px;
+  box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:12px;
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.stat-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 16px rgba(0,0,0,.08);
+}
+.stat-card-top{
+  display:flex;align-items:center;justify-content:space-between;
+}
+.stat-card-label{font-size:13px;color:var(--text-2);font-weight:500;}
+.stat-card-icon{
+  width:40px;height:40px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+}
+.stat-card-value{
+  font-size:30px;font-weight:700;color:var(--text-1);
+  line-height:1;
+}
+.stat-card-trend{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;
+}
+.trend-up{color:var(--risk-low);}
+.trend-down{color:var(--risk-high);}
+.trend-neutral{color:var(--text-3);}
+
+/* ========== 图表卡片 ========== */
+.chart-row{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:16px;
+}
+.panel{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.panel-header{
+  padding:16px 20px;
+  border-bottom:1px solid var(--border-light);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.panel-title{font-size:15px;font-weight:600;color:var(--text-1);}
+.panel-body{padding:20px;}
+
+#riskChart{width:100%;height:320px;}
+
+/* 风险等级分布列表 */
+.risk-distrib-list{display:flex;flex-direction:column;gap:14px;}
+.risk-distrib-item{
+  display:flex;align-items:center;gap:12px;
+}
+.rdi-label{
+  width:70px;font-size:13px;color:var(--text-2);
+  display:flex;align-items:center;gap:6px;
+}
+.rdi-dot{width:8px;height:8px;border-radius:50%;}
+.rdi-bar-wrap{
+  flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;
+}
+.rdi-bar{height:100%;border-radius:4px;transition:width .6s ease;}
+.rdi-value{font-size:13px;font-weight:600;color:var(--text-1);width:36px;text-align:right;}
+
+/* ========== 智能检索页 ========== */
+.search-hero{
+  background:linear-gradient(135deg,#3b6cf6 0%,#5577ed 50%,#6a5cf0 100%);
+  border-radius:var(--radius);
+  padding:32px;
+  margin-bottom:20px;
+  color:#fff;
+  position:relative;
+  overflow:hidden;
+}
+.search-hero::after{
+  content:'';position:absolute;right:-40px;top:-40px;
+  width:200px;height:200px;border-radius:50%;
+  background:rgba(255,255,255,.06);
+}
+.search-hero::before{
+  content:'';position:absolute;right:60px;bottom:-60px;
+  width:140px;height:140px;border-radius:50%;
+  background:rgba(255,255,255,.04);
+}
+.search-hero h2{font-size:20px;font-weight:700;margin-bottom:6px;position:relative;z-index:1;}
+.search-hero p{font-size:13px;opacity:.8;position:relative;z-index:1;margin-bottom:20px;}
+.search-box-large{
+  display:flex;gap:12px;
+  position:relative;z-index:1;
+}
+.search-box-large input{
+  flex:1;height:48px;
+  border:none;border-radius:10px;
+  padding:0 20px;
+  font-size:15px;color:var(--text-1);
+  background:rgba(255,255,255,.95);
+}
+.search-box-large input::placeholder{color:var(--text-3);}
+.search-box-large button{
+  height:48px;padding:0 28px;
+  background:var(--text-1);color:#fff;
+  border-radius:10px;font-size:14px;font-weight:600;
+  display:flex;align-items:center;gap:8px;
+  transition:opacity var(--transition);
+}
+.search-box-large button:hover{opacity:.9;}
+.search-tags{
+  display:flex;gap:8px;margin-top:16px;
+  position:relative;z-index:1;flex-wrap:wrap;
+}
+.search-tag-suggest{
+  font-size:12px;color:rgba(255,255,255,.8);
+  padding:4px 12px;border-radius:20px;
+  background:rgba(255,255,255,.12);
+  cursor:pointer;transition:all var(--transition);
+}
+.search-tag-suggest:hover{background:rgba(255,255,255,.25);color:#fff;}
+
+/* 筛选面板 */
+.filter-panel{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+  margin-bottom:20px;
+}
+.filter-row{
+  display:flex;align-items:flex-start;gap:16px;
+  padding:14px 0;
+  border-bottom:1px solid var(--border-light);
+}
+.filter-row:last-child{border-bottom:none;}
+.filter-label{
+  width:100px;flex-shrink:0;
+  font-size:13px;color:var(--text-2);font-weight:500;
+  padding-top:5px;
+}
+.filter-options{
+  flex:1;display:flex;flex-wrap:wrap;gap:8px;
+}
+.filter-chip{
+  padding:5px 14px;
+  border-radius:20px;
+  font-size:13px;
+  color:var(--text-2);
+  background:var(--bg);
+  border:1px solid transparent;
+  cursor:pointer;
+  transition:all var(--transition);
+  user-select:none;
+}
+.filter-chip:hover{border-color:var(--primary);color:var(--primary);}
+.filter-chip.active{
+  background:var(--primary-light);
+  color:var(--primary);
+  border-color:var(--primary);
+  font-weight:500;
+}
+
+/* 滑块筛选 */
+.slider-group{
+  display:grid;grid-template-columns:1fr 1fr;gap:32px;
+  padding:16px 0 8px;
+}
+.slider-block{}
+.slider-block-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;
+}
+.slider-block-title{
+  font-size:13px;font-weight:600;color:var(--text-1);
+  display:flex;align-items:center;gap:8px;
+}
+.slider-block-title .ai-tag{
+  font-size:10px;padding:2px 8px;border-radius:4px;
+  background:linear-gradient(135deg,#6a5cf0,#3b6cf6);color:#fff;
+  font-weight:600;letter-spacing:.5px;
+}
+.slider-value-display{
+  font-size:13px;font-weight:700;color:var(--primary);
+}
+.slider-track-wrap{position:relative;padding:0 4px;}
+.slider-track{
+  width:100%;height:6px;background:var(--bg);
+  border-radius:3px;position:relative;
+}
+.slider-fill{
+  position:absolute;height:100%;
+  background:linear-gradient(90deg,#3b6cf6,#6a5cf0);
+  border-radius:3px;
+}
+.slider-handle{
+  position:absolute;top:50%;transform:translate(-50%,-50%);
+  width:18px;height:18px;background:#fff;
+  border:3px solid var(--primary);
+  border-radius:50%;cursor:grab;
+  box-shadow:0 2px 6px rgba(59,108,246,.3);
+  transition:transform var(--transition);
+  z-index:2;
+}
+.slider-handle:hover{transform:translate(-50%,-50%) scale(1.15);}
+.slider-handle:active{cursor:grabbing;}
+.slider-scale{
+  display:flex;justify-content:space-between;
+  margin-top:10px;font-size:11px;color:var(--text-3);
+}
+
+.filter-actions{
+  display:flex;align-items:center;gap:12px;
+  margin-top:16px;padding-top:16px;
+  border-top:1px solid var(--border-light);
+}
+.btn{
+  padding:8px 20px;border-radius:8px;
+  font-size:13px;font-weight:500;
+  display:flex;align-items:center;gap:6px;
+  transition:all var(--transition);
+}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-ghost{background:var(--bg);color:var(--text-2);}
+.btn-ghost:hover{background:var(--border-light);color:var(--text-1);}
+
+/* 检索结果 */
+.search-results-info{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;
+}
+.results-count{font-size:14px;color:var(--text-2);}
+.results-count strong{color:var(--primary);font-size:16px;}
+
+/* 检索结果卡片 */
+.result-cards{display:flex;flex-direction:column;gap:12px;}
+.result-card{
+  background:var(--card);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:18px 20px;
+  display:flex;gap:16px;align-items:center;
+  transition:all var(--transition);
+  border:1px solid transparent;
+  cursor:pointer;
+}
+.result-card:hover{
+  border-color:var(--primary);
+  box-shadow:0 4px 20px rgba(59,108,246,.1);
+}
+.result-thumb{
+  width:120px;height:72px;border-radius:8px;
+  background:linear-gradient(135deg,#1a1f36,#2d3561);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;color:rgba(255,255,255,.5);
+  flex-shrink:0;position:relative;overflow:hidden;
+}
+.result-thumb::after{
+  content:'▶';position:absolute;
+  font-size:14px;color:rgba(255,255,255,.7);
+  background:rgba(0,0,0,.4);
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  padding-left:2px;
+}
+.result-info{flex:1;min-width:0;}
+.result-info h4{font-size:14px;font-weight:600;margin-bottom:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.result-meta{display:flex;gap:14px;font-size:12px;color:var(--text-3);flex-wrap:wrap;}
+.result-meta span{display:flex;align-items:center;gap:4px;}
+.result-scores{
+  display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  flex-shrink:0;
+}
+.score-pill{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;
+  padding:3px 10px;border-radius:12px;
+}
+.score-pill .score-num{font-size:14px;}
+
+/* ========== 表格页 ========== */
+.table-toolbar{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:16px;
+  flex-wrap:wrap;
+}
+.table-toolbar .toolbar-left{display:flex;align-items:center;gap:12px;}
+.table-toolbar .toolbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.toolbar-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:0 12px;height:36px;width:220px;
+}
+.toolbar-search input{border:none;background:transparent;flex:1;font-size:13px;}
+.toolbar-search input::placeholder{color:var(--text-3);}
+.table-card{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+table{width:100%;border-collapse:collapse;}
+thead th{
+  background:#f8f9fc;
+  padding:12px 16px;
+  text-align:left;
+  font-size:12px;font-weight:600;color:var(--text-2);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+thead th:first-child{width:44px;text-align:center;}
+tbody td{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border-light);
+  font-size:13px;color:var(--text-1);
+  white-space:nowrap;
+}
+tbody tr{transition:background var(--transition);}
+tbody tr:hover{background:#f8faff;}
+tbody tr:last-child td{border-bottom:none;}
+tbody td:first-child{text-align:center;}
+
+.checkbox{
+  width:16px;height:16px;
+  border:1.5px solid var(--border);
+  border-radius:4px;
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all var(--transition);
+  background:#fff;
+}
+.checkbox.checked{
+  background:var(--primary);border-color:var(--primary);
+}
+.checkbox.checked::after{
+  content:'✓';color:#fff;font-size:10px;font-weight:700;
+}
+.checkbox.indeterminate{
+  background:var(--primary);border-color:var(--primary);
+}
+.checkbox.indeterminate::after{
+  content:'';width:8px;height:2px;background:#fff;border-radius:1px;
+}
+
+/* 风险标签 */
+.risk-tag{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:6px;
+  font-size:12px;font-weight:600;
+}
+.risk-tag::before{content:'';width:6px;height:6px;border-radius:50%;}
+.risk-tag.high{background:var(--risk-high-bg);color:var(--risk-high);}
+.risk-tag.high::before{background:var(--risk-high);}
+.risk-tag.mid{background:var(--risk-mid-bg);color:var(--risk-mid);}
+.risk-tag.mid::before{background:var(--risk-mid);}
+.risk-tag.low{background:var(--risk-low-bg);color:var(--risk-low);}
+.risk-tag.low::before{background:var(--risk-low);}
+
+/* 操作按钮 */
+.action-btns{display:flex;gap:4px;}
+.action-btn{
+  width:30px;height:30px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;color:var(--text-2);
+  background:transparent;
+  transition:all var(--transition);
+}
+.action-btn:hover{background:var(--primary-light);color:var(--primary);}
+.action-btn.danger:hover{background:var(--risk-high-bg);color:var(--risk-high);}
+
+.scene-id{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--primary);font-weight:600;}
+.sensor-tag{
+  font-size:11px;padding:2px 8px;border-radius:4px;
+  background:var(--bg);color:var(--text-2);font-weight:500;
+}
+
+/* 分页 */
+.pagination{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;
+  border-top:1px solid var(--border-light);
+}
+.page-info{font-size:13px;color:var(--text-2);}
+.page-nav{display:flex;align-items:center;gap:4px;}
+.page-btn{
+  min-width:32px;height:32px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--text-2);
+  background:transparent;border:1px solid transparent;
+  transition:all var(--transition);padding:0 6px;
+}
+.page-btn:hover{background:var(--bg);color:var(--text-1);}
+.page-btn.active{background:var(--primary);color:#fff;font-weight:600;}
+.page-btn.disabled{color:var(--text-3);cursor:not-allowed;}
+.page-btn.disabled:hover{background:transparent;}
+.page-jumper{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);}
+.page-jumper input{
+  width:48px;height:32px;border:1px solid var(--border);
+  border-radius:6px;text-align:center;font-size:13px;
+}
+
+/* 批量操作浮动栏 */
+.batch-bar{
+  position:fixed;bottom:24px;left:248px;right:24px;
+  background:var(--text-1);color:#fff;
+  border-radius:10px;padding:14px 20px;
+  display:flex;align-items:center;gap:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.2);
+  z-index:90;
+  transform:translateY(100px);opacity:0;
+  transition:all var(--transition);
+  pointer-events:none;
+}
+.batch-bar.show{transform:translateY(0);opacity:1;pointer-events:auto;}
+.batch-bar .bb-count{
+  font-size:14px;font-weight:600;
+}
+.batch-bar .bb-count strong{color:#7eb0ff;font-size:18px;}
+.batch-bar .bb-actions{margin-left:auto;display:flex;gap:8px;}
+.bb-btn{
+  padding:7px 16px;border-radius:6px;font-size:13px;font-weight:500;
+  transition:all var(--transition);
+}
+.bb-btn.primary{background:var(--primary);color:#fff;}
+.bb-btn.primary:hover{background:var(--primary-dark);}
+.bb-btn.ghost{background:rgba(255,255,255,.1);color:#fff;}
+.bb-btn.ghost:hover{background:rgba(255,255,255,.2);}
+.bb-close{
+  width:28px;height:28px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,.6);font-size:16px;
+  background:transparent;
+}
+.bb-close:hover{color:#fff;background:rgba(255,255,255,.1);}
+
+/* ========== 弹窗通用 ========== */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(15,23,42,.55);
+  backdrop-filter:blur(2px);
+  z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;visibility:hidden;
+  transition:opacity var(--transition),visibility var(--transition);
+}
+.modal-overlay.show{opacity:1;visibility:visible;}
+.modal-box{
+  background:var(--card);
+  border-radius:14px;
+  box-shadow:var(--shadow-lg);
+  width:920px;max-width:94vw;
+  max-height:88vh;
+  display:flex;flex-direction:column;
+  transform:scale(.95) translateY(10px);
+  transition:transform var(--transition);
+}
+.modal-overlay.show .modal-box{transform:scale(1) translateY(0);}
+
+.modal-header{
+  padding:18px 24px;
+  border-bottom:1px solid var(--border-light);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.modal-title{font-size:16px;font-weight:700;color:var(--text-1);}
+.modal-title-sub{font-size:12px;color:var(--text-3);margin-top:2px;}
+.modal-close{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:var(--text-2);background:transparent;
+  transition:all var(--transition);
+}
+.modal-close:hover{background:var(--bg);color:var(--text-1);}
+.modal-body{
+  flex:1;overflow-y:auto;padding:24px;
+}
+
+/* 视频预览弹窗内容 */
+.video-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:20px;
+}
+.video-tile{
+  background:#0f172a;
+  border-radius:10px;
+  aspect-ratio:16/9;
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+.video-tile .vt-label{
+  position:absolute;top:8px;left:8px;
+  font-size:11px;color:rgba(255,255,255,.7);
+  background:rgba(0,0,0,.5);padding:2px 8px;border-radius:4px;
+  font-weight:500;
+}
+.video-tile .vt-play{
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(255,255,255,.15);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:16px;padding-left:3px;
+  cursor:pointer;transition:all var(--transition);
+}
+.video-tile .vt-play:hover{background:rgba(255,255,255,.25);transform:scale(1.1);}
+.video-tile .vt-live{
+  position:absolute;bottom:8px;right:8px;
+  font-size:10px;color:#ef4444;
+  display:flex;align-items:center;gap:4px;
+  background:rgba(0,0,0,.5);padding:2px 8px;border-radius:4px;
+}
+.video-tile .vt-live::before{
+  content:'';width:6px;height:6px;background:#ef4444;border-radius:50%;
+  animation:blink 1.5s infinite;
+}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+.ai-analysis-section{
+  background:#f8faff;border:1px solid #dbe7ff;border-radius:10px;
+  padding:18px;margin-bottom:16px;
+}
+.ai-analysis-header{
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;
+}
+.ai-badge{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:var(--primary);
+  background:var(--primary-light);padding:3px 10px;border-radius:6px;
+}
+.ai-analysis-text{font-size:13px;color:var(--text-1);line-height:1.8;}
+.ai-analysis-text .highlight{color:var(--risk-high);font-weight:600;}
+.ai-analysis-text .warn{color:var(--risk-mid);font-weight:600;}
+
+.risk-reasons-section{}
+.risk-reasons-title{
+  font-size:13px;font-weight:600;color:var(--text-2);
+  margin-bottom:10px;
+}
+.risk-reason-tags{display:flex;flex-wrap:wrap;gap:8px;}
+.risk-reason-tag{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:8px;
+  font-size:12px;font-weight:500;
+  background:var(--risk-high-bg);color:var(--risk-high);
+  border:1px solid #fecaca;
+}
+.risk-reason-tag.mid{background:var(--risk-mid-bg);color:var(--risk-mid);border-color:#fde68a;}
+
+.modal-footer{
+  padding:16px 24px;
+  border-top:1px solid var(--border-light);
+  display:flex;align-items:center;gap:12px;
+  flex-shrink:0;
+}
+.modal-footer .mf-info{font-size:13px;color:var(--text-3);}
+
+/* ========== 侧边抽屉 ========== */
+.drawer-overlay{
+  position:fixed;inset:0;
+  background:rgba(15,23,42,.4);
+  backdrop-filter:blur(1px);
+  z-index:200;
+  opacity:0;visibility:hidden;
+  transition:opacity var(--transition),visibility var(--transition);
+}
+.drawer-overlay.show{opacity:1;visibility:visible;}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;
+  width:440px;max-width:90vw;
+  background:var(--card);
+  z-index:210;
+  display:flex;flex-direction:column;
+  transform:translateX(100%);
+  transition:transform var(--transition);
+  box-shadow:-8px 0 32px rgba(0,0,0,.1);
+}
+.drawer.show{transform:translateX(0);}
+.drawer-header{
+  padding:20px 24px;
+  border-bottom:1px solid var(--border-light);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.drawer-title{font-size:17px;font-weight:700;}
+.drawer-title-sub{font-size:12px;color:var(--text-3);margin-top:2px;}
+.drawer-body{flex:1;overflow-y:auto;padding:24px;}
+
+.form-group{margin-bottom:24px;}
+.form-label{
+  font-size:13px;font-weight:600;color:var(--text-1);
+  margin-bottom:8px;display:block;
+}
+.form-label .required{color:var(--risk-high);}
+.form-input{
+  width:100%;height:42px;
+  border:1px solid var(--border);border-radius:8px;
+  padding:0 14px;font-size:14px;color:var(--text-1);
+  background:var(--card);
+  transition:border-color var(--transition);
+}
+.form-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light);}
+.form-input::placeholder{color:var(--text-3);}
+.form-hint{font-size:12px;color:var(--text-3);margin-top:6px;}
+
+.form-select{
+  width:100%;height:42px;
+  border:1px solid var(--border);border-radius:8px;
+  padding:0 14px;font-size:14px;color:var(--text-1);
+  background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 14px center;
+  appearance:none;cursor:pointer;
+}
+.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light);}
+
+.selected-samples{
+  background:var(--bg);border-radius:10px;padding:14px;
+  max-height:180px;overflow-y:auto;
+}
+.sample-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:6px;padding:5px 10px;
+  font-size:12px;color:var(--text-1);font-weight:500;
+  margin:3px;
+}
+.sample-chip .chip-close{
+  color:var(--text-3);cursor:pointer;font-size:14px;
+  transition:color var(--transition);
+}
+.sample-chip .chip-close:hover{color:var(--risk-high);}
+
+.config-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid var(--border-light);
+}
+.config-row:last-child{border-bottom:none;}
+.config-row-label{font-size:13px;color:var(--text-2);}
+.config-row-value{font-size:13px;font-weight:600;color:var(--text-1);}
+
+.toggle{
+  width:40px;height:22px;border-radius:11px;
+  background:var(--border);position:relative;
+  cursor:pointer;transition:background var(--transition);
+}
+.toggle.on{background:var(--primary);}
+.toggle::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:18px;height:18px;background:#fff;border-radius:50%;
+  transition:transform var(--transition);
+}
+.toggle.on::after{transform:translateX(18px);}
+
+.drawer-footer{
+  padding:16px 24px;
+  border-top:1px solid var(--border-light);
+  display:flex;gap:12px;
+  flex-shrink:0;
+}
+.drawer-footer .btn{flex:1;justify-content:center;height:42px;}
+
+/* 空状态 */
+.empty-state{
+  text-align:center;padding:48px 20px;
+  color:var(--text-3);
+}
+.empty-state .es-icon{font-size:48px;margin-bottom:12px;opacity:.4;}
+.empty-state p{font-size:14px;}
+
+/* 响应式 */
+@media(max-width:1200px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .chart-row{grid-template-columns:1fr;}
+  .slider-group{grid-template-columns:1fr;}
+}
+@media(max-width:768px){
+  .sidebar{width:60px;}
+  .sidebar-logo .logo-text,.menu-item span:not(.mi-icon),
+  .menu-group-label,.sidebar-footer .user-info{display:none;}
+  .main-wrapper{margin-left:60px;}
+  .stats-grid{grid-template-columns:1fr;}
+  .video-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 侧边栏 ========== -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⛏</div>
+    <span class="logo-text">Scene-Miner</span>
+  </div>
+  <nav class="sidebar-menu">
+    <div class="menu-group-label">核心功能</div>
+    <div class="menu-item active" data-page="dashboard">
+      <span class="mi-icon">▣</span><span>数据看板</span>
+    </div>
+    <div class="menu-item" data-page="search">
+      <span class="mi-icon">◎</span><span>智能检索</span>
+    </div>
+    <div class="menu-item" data-page="samples">
+      <span class="mi-icon">☰</span><span>长尾样本</span>
+      <span class="mi-badge">128</span>
+    </div>
+    <div class="menu-group-label">数据管理</div>
+    <div class="menu-item" data-page="datasets">
+      <span class="mi-icon">▤</span><span>数据集</span>
+    </div>
+    <div class="menu-item" data-page="annotation">
+      <span class="mi-icon">✎</span><span>标注任务</span>
+    </div>
+    <div class="menu-group-label">系统</div>
+    <div class="menu-item" data-page="settings">
+      <span class="mi-icon">⚙</span><span>系统设置</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="avatar">张</div>
+    <div class="user-info">
+      <div class="user-name">员工姓名</div>
+      <div class="user-role">员工职位</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ========== 主区域 ========== -->
+<div class="main-wrapper">
+  <!-- 顶部导航 -->
+  <header class="topbar">
+    <div class="breadcrumb">
+      <span>Scene-Miner</span>
+      <span class="bc-sep">/</span>
+      <span class="bc-current" id="bcCurrent">数据看板</span>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-search">
+        <span class="ts-icon">🔍</span>
+        <input type="text" placeholder="全局搜索场景、样本...">
+      </div>
+      <button class="topbar-icon-btn" title="通知">
+        🔔<span class="dot"></span>
+      </button>
+      <button class="topbar-icon-btn" title="帮助">❓</button>
+    </div>
+  </header>
+
+  <!-- 内容区 -->
+  <div class="content-area">
+
+    <!-- ===== 页面1: 首页数据看板 ===== -->
+    <div class="page active" id="page-dashboard">
+      <h1 class="page-title">数据看板</h1>
+      <p class="page-subtitle">智驾长尾危险场景挖掘全链路数据概览 · 更新于 2026-08-12 09:00</p>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-card-label">已扫描路测视频</span>
+            <div class="stat-card-icon" style="background:#e8f0ff;color:#3b6cf6;">🎬</div>
+          </div>
+          <div class="stat-card-value">48,726</div>
+          <div class="stat-card-trend trend-up">
+            <span>↑ 12.4%</span><span style="color:var(--text-3)">较上周</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-card-label">高风险长尾场景</span>
+            <div class="stat-card-icon" style="background:var(--risk-high-bg);color:var(--risk-high);">⚠</div>
+          </div>
+          <div class="stat-card-value">1,832</div>
+          <div class="stat-card-trend trend-up">
+            <span>↑ 8.7%</span><span style="color:var(--text-3)">较上周</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-card-label">本周新增困难样本</span>
+            <div class="stat-card-icon" style="background:var(--risk-mid-bg);color:var(--risk-mid);">📊</div>
+          </div>
+          <div class="stat-card-value">347</div>
+          <div class="stat-card-trend trend-up">
+            <span>↑ 23.1%</span><span style="color:var(--text-3)">较上周</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-card-label">已推送标注任务</span>
+            <div class="stat-card-icon" style="background:#f0fdf4;color:var(--risk-low);">✓</div>
+          </div>
+          <div class="stat-card-value">962</div>
+          <div class="stat-card-trend trend-neutral">
+            <span>— 持平</span><span style="color:var(--text-3)">较上周</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-row">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">风险场景类型分布统计</span>
+            <div style="display:flex;gap:6px;">
+              <button class="filter-chip active" style="font-size:12px;padding:3px 12px;">本月</button>
+              <button class="filter-chip" style="font-size:12px;padding:3px 12px;">本季</button>
+              <button class="filter-chip" style="font-size:12px;padding:3px 12px;">全年</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="riskChart"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">风险等级占比</span>
+          </div>
+          <div class="panel-body">
+            <div class="risk-distrib-list">
+              <div class="risk-distrib-item">
+                <div class="rdi-label"><span class="rdi-dot" style="background:var(--risk-high);"></span>高风险</div>
+                <div class="rdi-bar-wrap"><div class="rdi-bar" style="width:28%;background:var(--risk-high);"></div></div>
+                <div class="rdi-value">28%</div>
+              </div>
+              <div class="risk-distrib-item">
+                <div class="rdi-label"><span class="rdi-dot" style="background:var(--risk-mid);"></span>中风险</div>
+                <div class="rdi-bar-wrap"><div class="rdi-bar" style="width:45%;background:var(--risk-mid);"></div></div>
+                <div class="rdi-value">45%</div>
+              </div>
+              <div class="risk-distrib-item">
+                <div class="rdi-label"><span class="rdi-dot" style="background:var(--risk-low);"></span>低风险</div>
+                <div class="rdi-bar-wrap"><div class="rdi-bar" style="width:27%;background:var(--risk-low);"></div></div>
+                <div class="rdi-value">27%</div>
+              </div>
+            </div>
+            <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border-light);">
+              <div style="font-size:13px;color:var(--text-2);margin-bottom:10px;font-weight:600;">TOP 危险场景类型</div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;justify-content:space-between;font-size:13px;">
+                  <span style="color:var(--text-2);">鬼探头 / 盲区行人</span>
+                  <span style="font-weight:700;color:var(--risk-high);">412</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;">
+                  <span style="color:var(--text-2);">逆行车辆对向行驶</span>
+                  <span style="font-weight:700;color:var(--risk-high);">328</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;">
+                  <span style="color:var(--text-2);">恶劣天气突发打滑</span>
+                  <span style="font-weight:700;color:var(--risk-mid);">276</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;">
+                  <span style="color:var(--text-2);">施工路段异常变道</span>
+                  <span style="font-weight:700;color:var(--risk-mid);">231</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;">
+                  <span style="color:var(--text-2);">夜间无灯行人横穿</span>
+                  <span style="font-weight:700;color:var(--risk-mid);">189</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 页面2: 智能检索 ===== -->
+    <div class="page" id="page-search">
+      <h1 class="page-title">智能检索</h1>
+      <p class="page-subtitle">基于自然语言与多维条件，精准定位长尾危险场景</p>
+
+      <div class="search-hero">
+        <h2>AI 语义场景检索引擎</h2>
+        <p>输入自然语言描述危险路况，AI 自动匹配语义相似的长尾场景</p>
+        <div class="search-box-large">
+          <input type="text" id="nlSearch" placeholder="例如：雨天夜间行人从停靠车辆间突然穿出...">
+          <button onclick="performSearch()">🔍 语义检索</button>
+        </div>
+        <div class="search-tags">
+          <span style="font-size:12px;opacity:.7;margin-right:4px;">热门搜索：</span>
+          <span class="search-tag-suggest" onclick="quickSearch(this)">鬼探头盲区行人</span>
+          <span class="search-tag-suggest" onclick="quickSearch(this)">逆行对向车辆</span>
+          <span class="search-tag-suggest" onclick="quickSearch(this)">暴雨打滑失控</span>
+          <span class="search-tag-suggest" onclick="quickSearch(this)">施工路段锥桶侵入</span>
+          <span class="search-tag-suggest" onclick="quickSearch(this)">夜间无灯行人</span>
+        </div>
+      </div>
+
+      <div class="filter-panel">
+        <div class="filter-row">
+          <div class="filter-label">天气条件</div>
+          <div class="filter-options">
+            <span class="filter-chip active" onclick="toggleChip(this)">晴天</span>
+            <span class="filter-chip" onclick="toggleChip(this)">多云</span>
+            <span class="filter-chip active" onclick="toggleChip(this)">雨天</span>
+            <span class="filter-chip" onclick="toggleChip(this)">雪天</span>
+            <span class="filter-chip" onclick="toggleChip(this)">雾天</span>
+            <span class="filter-chip active" onclick="toggleChip(this)">夜间</span>
+            <span class="filter-chip" onclick="toggleChip(this)">沙尘</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-label">时间段</div>
+          <div class="filter-options">
+            <span class="filter-chip" onclick="toggleChip(this)">凌晨 0-6时</span>
+            <span class="filter-chip active" onclick="toggleChip(this)">早晨 6-9时</span>
+            <span class="filter-chip" onclick="toggleChip(this)">上午 9-12时</span>
+            <span class="filter-chip" onclick="toggleChip(this)">下午 12-18时</span>
+            <span class="filter-chip active" onclick="toggleChip(this)">傍晚 18-21时</span>
+            <span class="filter-chip" onclick="toggleChip(this)">深夜 21-24时</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-label">道路类型</div>
+          <div class="filter-options">
+            <span class="filter-chip active" onclick="toggleChip(this)">城市道路</span>
+            <span class="filter-chip" onclick="toggleChip(this)">高速公路</span>
+            <span class="filter-chip" onclick="toggleChip(this)">城际快速路</span>
+            <span class="filter-chip" onclick="toggleChip(this)">乡村道路</span>
+            <span class="filter-chip" onclick="toggleChip(this)">地下隧道</span>
+            <span class="filter-chip" onclick="toggleChip(this)">立交桥</span>
+            <span class="filter-chip" onclick="toggleChip(this)">停车场</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-label">接管事件</div>
+          <div class="filter-options">
+            <span class="filter-chip active" onclick="toggleChip(this)">紧急接管</span>
+            <span class="filter-chip" onclick="toggleChip(this)">舒适接管</span>
+            <span class="filter-chip" onclick="toggleChip(this)">规划异常</span>
+            <span class="filter-chip" onclick="toggleChip(this)">感知丢帧</span>
+            <span class="filter-chip" onclick="toggleChip(this)">无接管</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-label">置信度异常</div>
+          <div class="filter-options">
+            <span class="filter-chip" onclick="toggleChip(this)">感知置信度骤降</span>
+            <span class="filter-chip active" onclick="toggleChip(this)">预测轨迹发散</span>
+            <span class="filter-chip" onclick="toggleChip(this)">规划频繁重计算</span>
+            <span class="filter-chip" onclick="toggleChip(this)">多传感器融合冲突</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-block">
+            <div class="slider-block-header">
+              <span class="slider-block-title">AI 样本稀缺度 <span class="ai-tag">AI</span></span>
+              <span class="slider-value-display" id="scarcityDisplay">30 — 100</span>
+            </div>
+            <div class="slider-track-wrap">
+              <div class="slider-track">
+                <div class="slider-fill" id="scarcityFill" style="left:30%;width:70%;"></div>
+                <div class="slider-handle" id="scarcityHandle1" style="left:30%;"></div>
+                <div class="slider-handle" id="scarcityHandle2" style="left:100%;"></div>
+              </div>
+              <div class="slider-scale">
+                <span>0 常见</span><span>50</span><span>100 极稀缺</span>
+              </div>
+            </div>
+          </div>
+          <div class="slider-block">
+            <div class="slider-block-header">
+              <span class="slider-block-title">风险评分 <span class="ai-tag">AI</span></span>
+              <span class="slider-value-display" id="riskDisplay">60 — 100</span>
+            </div>
+            <div class="slider-track-wrap">
+              <div class="slider-track">
+                <div class="slider-fill" id="riskFill" style="left:60%;width:40%;"></div>
+                <div class="slider-handle" id="riskHandle1" style="left:60%;"></div>
+                <div class="slider-handle" id="riskHandle2" style="left:100%;"></div>
+              </div>
+              <div class="slider-scale">
+                <span>0 低危</span><span>50</span><span>100 极高危</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-primary" onclick="performSearch()">🔍 应用筛选</button>
+          <button class="btn btn-ghost" onclick="resetFilters()">重置条件</button>
+          <span style="margin-left:auto;font-size:13px;color:var(--text-3);">
+            已选条件：<strong id="filterCount" style="color:var(--primary);">8</strong> 项
+          </span>
+        </div>
+      </div>
+
+      <div class="search-results-info">
+        <div class="results-count">共检索到 <strong>37</strong> 个匹配场景</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:13px;color:var(--text-2);">排序：</span>
+          <select class="form-select" style="width:auto;height:34px;font-size:13px;">
+            <option>风险评分 ↓</option>
+            <option>稀缺度 ↓</option>
+            <option>采集时间 ↓</option>
+            <option>相关度 ↓</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="result-cards" id="searchResults">
+        <!-- 由JS动态生成 -->
+      </div>
+    </div>
+
+    <!-- ===== 页面3: 长尾样本列表 ===== -->
+    <div class="page" id="page-samples">
+      <h1 class="page-title">长尾样本列表</h1>
+      <p class="page-subtitle">已挖掘的高价值长尾危险场景样本库 · 共 1,832 条</p>
+
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <div class="toolbar-search">
+            <span style="color:var(--text-3);">🔍</span>
+            <input type="text" placeholder="搜索场景编号或关键词...">
+          </div>
+          <select class="form-select" style="width:auto;height:36px;font-size:13px;">
+            <option>全部风险等级</option>
+            <option>高风险</option>
+            <option>中风险</option>
+            <option>低风险</option>
+          </select>
+          <select class="form-select" style="width:auto;height:36px;font-size:13px;">
+            <option>全部传感器</option>
+            <option>摄像头</option>
+            <option>激光雷达</option>
+            <option>毫米波雷达</option>
+          </select>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-ghost" onclick="switchPage('search')">🔍 高级检索</button>
+          <button class="btn btn-primary" onclick="openBatchDrawer()">⚡ 批量配置</button>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th><div class="checkbox" id="checkAll" onclick="toggleAll(this)"></div></th>
+              <th>场景编号</th>
+              <th>场景简介</th>
+              <th>风险等级</th>
+              <th>稀缺分值</th>
+              <th>采集时间</th>
+              <th>传感器类型</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="sampleTableBody">
+            <!-- 由JS动态生成 -->
+          </tbody>
+        </table>
+        <div class="pagination">
+          <div class="page-info">共 <strong style="color:var(--text-1);">1,832</strong> 条记录，第 <strong style="color:var(--primary);" id="currentPage">1</strong> / 184 页</div>
+          <div class="page-nav">
+            <button class="page-btn disabled" onclick="changePage(-1)">‹</button>
+            <button class="page-btn active" onclick="goToPage(this,1)">1</button>
+            <button class="page-btn" onclick="goToPage(this,2)">2</button>
+            <button class="page-btn" onclick="goToPage(this,3)">3</button>
+            <button class="page-btn" onclick="goToPage(this,4)">4</button>
+            <button class="page-btn" onclick="goToPage(this,5)">5</button>
+            <span style="color:var(--text-3);padding:0 4px;">...</span>
+            <button class="page-btn" onclick="goToPage(this,184)">184</button>
+            <button class="page-btn" onclick="changePage(1)">›</button>
+          </div>
+          <div class="page-jumper">
+            跳至 <input type="number" value="1" min="1" max="184" onchange="jumpPage(this)"> 页
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 占位页面 -->
+    <div class="page" id="page-datasets">
+      <div class="empty-state">
+        <div class="es-icon">▤</div>
+        <p>数据集管理模块 · 敬请期待</p>
+      </div>
+    </div>
+    <div class="page" id="page-annotation">
+      <div class="empty-state">
+        <div class="es-icon">✎</div>
+        <p>标注任务管理模块 · 敬请期待</p>
+      </div>
+    </div>
+    <div class="page" id="page-settings">
+      <div class="empty-state">
+        <div class="es-icon">⚙</div>
+        <p>系统设置模块 · 敬请期待</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========== 视频预览弹窗 ========== -->
+<div class="modal-overlay" id="videoModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="videoModalTitle">场景预览 · SM-20260812-0341</div>
+        <div class="modal-title-sub">采集时间：2026-08-11 18:42:13 · 位置：上海市浦东新区张江路</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('videoModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- 多路传感器视频 -->
+      <div class="video-grid">
+        <div class="video-tile">
+          <span class="vt-label">前视摄像头</span>
+          <div class="vt-play">▶</div>
+          <span class="vt-live">LIVE</span>
+        </div>
+        <div class="video-tile">
+          <span class="vt-label">后视摄像头</span>
+          <div class="vt-play">▶</div>
+          <span class="vt-live">LIVE</span>
+        </div>
+        <div class="video-tile">
+          <span class="vt-label">左侧视摄像头</span>
+          <div class="vt-play">▶</div>
+          <span class="vt-live">LIVE</span>
+        </div>
+        <div class="video-tile">
+          <span class="vt-label">激光雷达点云</span>
+          <div class="vt-play">▶</div>
+          <span class="vt-live">LIVE</span>
+        </div>
+      </div>
+
+      <!-- AI解析 -->
+      <div class="ai-analysis-section">
+        <div class="ai-analysis-header">
+          <span class="ai-badge">🤖 AI 场景解析</span>
+          <span style="font-size:12px;color:var(--text-3);">解析置信度 96.3%</span>
+        </div>
+        <div class="ai-analysis-text">
+          在 <span class="highlight">18:42:13</span> 时刻，车辆以 <strong>38km/h</strong> 速度行驶于城市双向四车道。
+          前方 <strong>45米</strong> 处停靠公交车右侧，一名行人从公交车车头盲区突然穿出横穿马路。
+          感知系统在 <span class="warn">120ms</span> 内识别到行人但预测轨迹存在 <span class="warn">较大不确定度</span>，
+          规划模块触发 <span class="highlight">紧急制动</span>，减速至 <strong>0km/h</strong>。
+          该场景核心难点在于 <span class="highlight">公交车遮挡导致的感知盲区</span> 及 <span class="warn">行人意图预测延迟</span>。
+          场景稀缺度高，当前数据集中同类样本不足 <strong>0.3%</strong>，建议优先纳入训练集。
+        </div>
+      </div>
+
+      <!-- 风险原因标签 -->
+      <div class="risk-reasons-section">
+        <div class="risk-reasons-title">⚠ 风险原因标签</div>
+        <div class="risk-reason-tags">
+          <span class="risk-reason-tag">🚶 行人鬼探头</span>
+          <span class="risk-reason-tag">🚌 大车遮挡盲区</span>
+          <span class="risk-reason-tag">⚡ 紧急制动</span>
+          <span class="risk-reason-tag">📊 预测不确定度高</span>
+          <span class="risk-reason-tag mid">🌙 光线不足</span>
+          <span class="risk-reason-tag mid">🛣 斑马线外穿行</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="mf-info">风险评分 92 · 稀缺度 95 · 采集设备：L4自动驾驶测试车 #A07</span>
+      <div style="margin-left:auto;display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('videoModal');openBatchDrawer();">加入数据集</button>
+        <button class="btn btn-primary" onclick="closeModal('videoModal');openBatchDrawer();">推送至标注平台 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 样本批量配置侧边弹窗 ========== -->
+<div class="drawer-overlay" id="batchDrawerOverlay" onclick="closeBatchDrawer()"></div>
+<div class="drawer" id="batchDrawer">
+  <div class="drawer-header">
+    <div>
+      <div class="drawer-title">批量配置 & 推送</div>
+      <div class="drawer-title-sub" id="drawerSubTitle">已选择 0 个样本</div>
+    </div>
+    <button class="modal-close" onclick="closeBatchDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="form-group">
+      <label class="form-label">数据集名称 <span class="required">*</span></label>
+      <input type="text" class="form-input" id="datasetName" placeholder="例如：longtail_pedestrian_202608" value="longtail_ghost_pedestrian_202608">
+      <div class="form-hint">将作为下游标注任务的标签数据集名称，建议包含场景类型与日期</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">目标标注平台 <span class="required">*</span></label>
+      <select class="form-select" id="annotPlatform">
+        <option value="labelbox">Labelbox 标注平台</option>
+        <option value="cvat">CVAT 开源标注工具</option>
+        <option value="scale">Scale AI</option>
+        <option value="internal">内部标注系统 v2.0</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">标注任务类型</label>
+      <select class="form-select">
+        <option>3D 目标检测标注</option>
+        <option>2D 目标框标注</option>
+        <option>语义分割标注</option>
+        <option>车道线标注</option>
+        <option>行人意图标注</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">已选样本（<span id="selectedCountInline">0</span>）</label>
+      <div class="selected-samples" id="selectedSamplesList">
+        <span style="font-size:12px;color:var(--text-3);">暂未选择样本</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">推送配置</label>
+      <div style="background:var(--bg);border-radius:10px;padding:4px 14px;">
+        <div class="config-row">
+          <span class="config-row-label">自动分配标注员</span>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="config-row">
+          <span class="config-row-label">同步传感器标定数据</span>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="config-row">
+          <span class="config-row-label">附带AI预标注结果</span>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="config-row">
+          <span class="config-row-label">推送后通知钉钉群</span>
+          <div class="toggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">备注说明</label>
+      <textarea class="form-input" style="height:80px;padding:10px 14px;resize:vertical;font-family:inherit;" placeholder="可填写场景说明、标注注意事项等..."></textarea>
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn btn-ghost" onclick="closeBatchDrawer()">取消</button>
+    <button class="btn btn-primary" onclick="confirmPush()">🚀 一键推送至标注平台</button>
+  </div>
+</div>
+
+<!-- 批量操作浮动栏 -->
+<div class="batch-bar" id="batchBar">
+  <span class="bb-count">已选择 <strong id="batchBarCount">0</strong> 个样本</span>
+  <div class="bb-actions">
+    <button class="bb-btn ghost" onclick="clearSelection()">清空选择</button>
+    <button class="bb-btn primary" onclick="openBatchDrawer()">⚡ 批量配置推送</button>
+  </div>
+  <button class="bb-close" onclick="clearSelection()">✕</button>
+</div>
+
+<script>
+// ========== 数据 ==========
+const sampleData = [
+  {id:'SM-20260812-0341',desc:'雨天夜间行人从公交车头盲区突然穿出',risk:'high',scarcity:95,time:'2026-08-11 18:42',sensor:'摄像头+激光雷达',thumb:'🚌'},
+  {id:'SM-20260812-0338',desc:'高速公路对向逆行车辆接近',risk:'high',scarcity:88,time:'2026-08-11 16:20',sensor:'摄像头+毫米波',thumb:'🚗'},
+  {id:'SM-20260812-0335',desc:'施工路段锥桶被撞后侵入车道',risk:'mid',scarcity:72,time:'2026-08-11 14:05',sensor:'摄像头',thumb:'🚧'},
+  {id:'SM-20260812-0332',desc:'隧道内暴雨积水导致车辆打滑',risk:'high',scarcity:81,time:'2026-08-11 11:33',sensor:'摄像头+激光雷达',thumb:'🌧'},
+  {id:'SM-20260812-0329',desc:'夜间无照明路段电动自行车逆行',risk:'high',scarcity:90,time:'2026-08-11 22:15',sensor:'摄像头+毫米波',thumb:'🛵'},
+  {id:'SM-20260812-0326',desc:'城市路口左转盲区非机动车突然切入',risk:'mid',scarcity:65,time:'2026-08-10 08:42',sensor:'摄像头',thumb:'🚲'},
+  {id:'SM-20260812-0323',desc:'立交桥下匝道汇入车辆未让行',risk:'mid',scarcity:58,time:'2026-08-10 17:28',sensor:'摄像头+激光雷达',thumb:'🌉'},
+  {id:'SM-20260812-0320',desc:'停车场内儿童从车后突然跑出',risk:'high',scarcity:93,time:'2026-08-10 15:10',sensor:'摄像头+激光雷达',thumb:'🅿'},
+  {id:'SM-20260812-0317',desc:'雾天高速跟车前车紧急制动',risk:'mid',scarcity:70,time:'2026-08-10 06:55',sensor:'摄像头+毫米波',thumb:'🌫'},
+  {id:'SM-20260812-0314',desc:'城市道路外卖骑手闯红灯横穿',risk:'mid',scarcity:62,time:'2026-08-09 12:30',sensor:'摄像头',thumb:'🛵'},
+  {id:'SM-20260812-0311',desc:'乡村道路牲畜突然闯入车道',risk:'low',scarcity:45,time:'2026-08-09 09:18',sensor:'摄像头',thumb:'🐄'},
+  {id:'SM-20260812-0308',desc:'高架出口违停车辆突然开门',risk:'mid',scarcity:55,time:'2026-08-08 19:42',sensor:'摄像头+激光雷达',thumb:'🚪'},
+];
+
+const riskMap = {
+  high:{label:'高风险',cls:'high'},
+  mid:{label:'中风险',cls:'mid'},
+  low:{label:'低风险',cls:'low'}
+};
+
+// ========== 页面切换 ==========
+function switchPage(pageId){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const page=document.getElementById('page-'+pageId);
+  if(page) page.classList.add('active');
+  document.querySelectorAll('.menu-item').forEach(m=>m.classList.remove('active'));
+  const menuItem=document.querySelector(`.menu-item[data-page="${pageId}"]`);
+  if(menuItem) menuItem.classList.add('active');
+  const labels={dashboard:'数据看板',search:'智能检索',samples:'长尾样本',datasets:'数据集',annotation:'标注任务',settings:'系统设置'};
+  document.getElementById('bcCurrent').textContent=labels[pageId]||'';
+  document.querySelector('.content-area').scrollTop=0;
+}
+
+document.querySelectorAll('.menu-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    const page=item.dataset.page;
+    if(page) switchPage(page);
+  });
+});
+
+// ========== ECharts 柱状图 ==========
+function initRiskChart(){
+  const chartDom=document.getElementById('riskChart');
+  if(!chartDom) return;
+  const chart=echarts.init(chartDom);
+  const option={
+    tooltip:{
+      trigger:'axis',
+      backgroundColor:'#fff',
+      borderColor:'#e4e7ed',
+      textStyle:{color:'#1a1f36',fontSize:13},
+      axisPointer:{type:'shadow',shadowStyle:{color:'rgba(59,108,246,.06)'}}
+    },
+    legend:{
+      data:['高风险','中风险','低风险'],
+      right:0,top:0,
+      itemWidth:10,itemHeight:10,
+      textStyle:{color:'#5c6378',fontSize:12}
+    },
+    grid:{left:10,right:10,bottom:10,top:40,containLabel:true},
+    xAxis:{
+      type:'category',
+      data:['鬼探头\n盲区行人','逆行车辆','恶劣天气\n打滑','施工路段\n异常变道','夜间无灯\n行人','路口\n非机动车','隧道积水','停车场\n突发'],
+      axisLine:{lineStyle:{color:'#e4e7ed'}},
+      axisLabel:{color:'#5c6378',fontSize:11,interval:0},
+      axisTick:{show:false}
+    },
+    yAxis:{
+      type:'value',
+      axisLine:{show:false},
+      axisLabel:{color:'#9ca3af',fontSize:11},
+      splitLine:{lineStyle:{color:'#f0f1f5',type:'dashed'}}
+    },
+    series:[
+      {name:'高风险',type:'bar',stack:'total',barWidth:'40%',
+        itemStyle:{color:'#ef4444',borderRadius:[0,0,0,0]},
+        data:[180,145,92,68,85,45,38,52]},
+      {name:'中风险',type:'bar',stack:'total',
+        itemStyle:{color:'#f59e0b'},
+        data:[165,120,138,112,78,95,72,68]},
+      {name:'低风险',type:'bar',stack:'total',
+        itemStyle:{color:'#22c55e',borderRadius:[4,4,0,0]},
+        data:[67,63,46,51,26,58,31,42]}
+    ]
+  };
+  chart.setOption(option);
+  window.addEventListener('resize',()=>chart.resize());
+}
+
+// ========== 渲染表格 ==========
+function renderTable(){
+  const tbody=document.getElementById('sampleTableBody');
+  if(!tbody) return;
+  tbody.innerHTML=sampleData.map((s,i)=>`
+    <tr>
+      <td><div class="checkbox" data-idx="${i}" onclick="toggleRow(this)"></div></td>
+      <td><span class="scene-id">${s.id}</span></td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;">${s.desc}</td>
+      <td><span class="risk-tag ${riskMap[s.risk].cls}">${riskMap[s.risk].label}</span></td>
+      <td><strong style="color:${s.scarcity>=80?'var(--risk-high)':s.scarcity>=60?'var(--risk-mid)':'var(--risk-low)'};">${s.scarcity}</strong></td>
+      <td style="color:var(--text-2);">${s.time}</td>
+      <td><span class="sensor-tag">${s.sensor}</span></td>
+      <td>
+        <div class="action-btns">
+          <button class="action-btn" title="预览" onclick="openVideoModal('${s.id}','${s.desc}')">▶</button>
+          <button class="action-btn" title="加入数据集" onclick="addToDataset('${s.id}')">📦</button>
+          <button class="action-btn" title="推送至标注平台" onclick="pushToAnnotation('${s.id}')">🚀</button>
+          <button class="action-btn" title="相似场景检索" onclick="searchSimilar('${s.id}')">🔗</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ========== 渲染搜索结果卡片 ==========
+function renderSearchResults(){
+  const container=document.getElementById('searchResults');
+  if(!container) return;
+  const results=sampleData.slice(0,6);
+  container.innerHTML=results.map(s=>`
+    <div class="result-card" onclick="openVideoModal('${s.id}','${s.desc}')">
+      <div class="result-thumb">${s.thumb}</div>
+      <div class="result-info">
+        <h4>${s.desc}</h4>
+        <div class="result-meta">
+          <span>🆔 ${s.id}</span>
+          <span>🕐 ${s.time}</span>
+          <span>📡 ${s.sensor}</span>
+        </div>
+      </div>
+      <div class="result-scores">
+        <span class="risk-tag ${riskMap[s.risk].cls}">${riskMap[s.risk].label}</span>
+        <div style="display:flex;gap:10px;">
+          <span class="score-pill" style="background:var(--primary-light);color:var(--primary);">稀缺度 <span class="score-num">${s.scarcity}</span></span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ========== 筛选chip切换 ==========
+function toggleChip(el){
+  el.classList.toggle('active');
+  updateFilterCount();
+}
+function updateFilterCount(){
+  const count=document.querySelectorAll('.filter-chip.active').length;
+  const el=document.getElementById('filterCount');
+  if(el) el.textContent=count;
+}
+function resetFilters(){
+  document.querySelectorAll('.filter-panel .filter-chip').forEach(c=>c.classList.remove('active'));
+  updateFilterCount();
+}
+function performSearch(){
+  const input=document.getElementById('nlSearch');
+  if(input&&input.value){
+    // 简单动画反馈
+    const btn=event.target.closest('button');
+    if(btn){
+      const orig=btn.innerHTML;
+      btn.innerHTML='⏳ 检索中...';
+      btn.style.opacity='.7';
+      setTimeout(()=>{
+        btn.innerHTML=orig;
+        btn.style.opacity='1';
+      },800);
+    }
+  }
+}
+function quickSearch(el){
+  document.getElementById('nlSearch').value=el.textContent;
+  performSearch();
+}
+
+// ========== 表格选择 ==========
+const selectedRows=new Set();
+function toggleRow(el){
+  el.classList.toggle('checked');
+  const idx=parseInt(el.dataset.idx);
+  if(el.classList.contains('checked')){
+    selectedRows.add(idx);
+  }else{
+    selectedRows.delete(idx);
+  }
+  updateBatchBar();
+  updateCheckAllState();
+}
+function toggleAll(el){
+  const rows=document.querySelectorAll('#sampleTableBody .checkbox');
+  if(el.classList.contains('checked')||el.classList.contains('indeterminate')){
+    el.classList.remove('checked','indeterminate');
+    rows.forEach(r=>r.classList.remove('checked'));
+    selectedRows.clear();
+  }else{
+    el.classList.add('checked');
+    rows.forEach(r=>{
+      r.classList.add('checked');
+      selectedRows.add(parseInt(r.dataset.idx));
+    });
+  }
+  updateBatchBar();
+}
+function updateCheckAllState(){
+  const total=document.querySelectorAll('#sampleTableBody .checkbox').length;
+  const checked=document.querySelectorAll('#sampleTableBody .checkbox.checked').length;
+  const checkAll=document.getElementById('checkAll');
+  if(checked===0){
+    checkAll.classList.remove('checked','indeterminate');
+  }else if(checked===total){
+    checkAll.classList.remove('indeterminate');
+    checkAll.classList.add('checked');
+  }else{
+    checkAll.classList.remove('checked');
+    checkAll.classList.add('indeterminate');
+  }
+}
+function updateBatchBar(){
+  const bar=document.getElementById('batchBar');
+  const count=document.getElementById('batchBarCount');
+  count.textContent=selectedRows.size;
+  if(selectedRows.size>0){
+    bar.classList.add('show');
+  }else{
+    bar.classList.remove('show');
+  }
+}
+function clearSelection(){
+  selectedRows.clear();
+  document.querySelectorAll('#sampleTableBody .checkbox').forEach(r=>r.classList.remove('checked'));
+  const checkAll=document.getElementById('checkAll');
+  checkAll.classList.remove('checked','indeterminate');
+  updateBatchBar();
+}
+
+// ========== 弹窗 ==========
+function openVideoModal(id,desc){
+  document.getElementById('videoModalTitle').textContent='场景预览 · '+id;
+  const overlay=document.getElementById('videoModal');
+  overlay.classList.add('show');
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+}
+
+// ========== 批量配置抽屉 ==========
+function openBatchDrawer(){
+  const drawer=document.getElementById('batchDrawer');
+  const overlay=document.getElementById('batchDrawerOverlay');
+  drawer.classList.add('show');
+  overlay.classList.add('show');
+  // 更新已选样本
+  const count=selectedRows.size||1;
+  document.getElementById('drawerSubTitle').textContent=`已选择 ${count} 个样本`;
+  document.getElementById('selectedCountInline').textContent=count;
+  const listEl=document.getElementById('selectedSamplesList');
+  if(selectedRows.size>0){
+    listEl.innerHTML=Array.from(selectedRows).map(idx=>{
+      const s=sampleData[idx];
+      return `<span class="sample-chip">${s.id} <span class="chip-close" onclick="removeSample(this,${idx})">✕</span></span>`;
+    }).join('');
+  }else{
+    listEl.innerHTML='<span class="sample-chip">SM-20260812-0341</span><span class="sample-chip">SM-20260812-0329</span><span style="font-size:12px;color:var(--text-3);margin-left:6px;">（示例预选）</span>';
+  }
+}
+function closeBatchDrawer(){
+  document.getElementById('batchDrawer').classList.remove('show');
+  document.getElementById('batchDrawerOverlay').classList.remove('show');
+}
+function removeSample(el,idx){
+  el.parentElement.remove();
+  const checkbox=document.querySelector(`.checkbox[data-idx="${idx}"]`);
+  if(checkbox){
+    checkbox.classList.remove('checked');
+    selectedRows.delete(idx);
+  }
+  const count=selectedRows.size;
+  document.getElementById('drawerSubTitle').textContent=`已选择 ${count} 个样本`;
+  document.getElementById('selectedCountInline').textContent=count;
+  document.getElementById('batchBarCount').textContent=count;
+  if(count===0){
+    document.getElementById('batchBar').classList.remove('show');
+  }
+}
+function confirmPush(){
+  const btn=event.target.closest('button');
+  const orig=btn.innerHTML;
+  btn.innerHTML='⏳ 推送中...';
+  btn.style.opacity='.7';
+  setTimeout(()=>{
+    btn.innerHTML='✓ 推送成功！';
+    btn.style.background='var(--risk-low)';
+    setTimeout(()=>{
+      closeBatchDrawer();
+      clearSelection();
+      btn.innerHTML=orig;
+      btn.style.opacity='1';
+      btn.style.background='';
+    },1200);
+  },1000);
+}
+
+// ========== 操作按钮 ==========
+function addToDataset(id){
+  // 简单反馈
+  showToast(`样本 ${id} 已加入数据集`);
+}
+function pushToAnnotation(id){
+  openBatchDrawer();
+}
+function searchSimilar(id){
+  switchPage('search');
+  document.getElementById('nlSearch').value='相似场景检索：'+id;
+}
+
+// ========== 分页 ==========
+function goToPage(btn,page){
+  document.querySelectorAll('.page-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('currentPage').textContent=page;
+}
+function changePage(dir){
+  const active=document.querySelector('.page-btn.active');
+  if(!active) return;
+  const pages=document.querySelectorAll('.page-nav .page-btn:not(.disabled)');
+  let idx=Array.from(pages).indexOf(active);
+  if(idx===-1) return;
+  idx+=dir;
+  if(idx<0||idx>=pages.length) return;
+  pages[idx].click();
+}
+function jumpPage(input){
+  const page=parseInt(input.value);
+  if(page>=1&&page<=184){
+    document.getElementById('currentPage').textContent=page;
+  }
+}
+
+// ========== Toast 提示 ==========
+function showToast(msg){
+  let toast=document.getElementById('toast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='toast';
+    toast.style.cssText=`
+      position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);
+      background:var(--text-1);color:#fff;padding:12px 24px;
+      border-radius:8px;font-size:14px;z-index:9999;
+      opacity:0;transition:all .3s ease;box-shadow:0 4px 16px rgba(0,0,0,.2);
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.textContent=msg;
+  toast.style.opacity='1';
+  toast.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(toast.timer);
+  toast.timer=setTimeout(()=>{
+    toast.style.opacity='0';
+    toast.style.transform='translateX(-50%) translateY(-20px)';
+  },2500);
+}
+
+// ========== ESC关闭弹窗 ==========
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    closeModal('videoModal');
+    closeBatchDrawer();
+  }
+});
+
+// ========== 初始化 ==========
+window.addEventListener('DOMContentLoaded',()=>{
+  initRiskChart();
+  renderTable();
+  renderSearchResults();
+  const scarcityTrack=document.querySelector('#scarcityHandle1').parentElement;
+  const riskTrack=document.querySelector('#riskHandle1').parentElement;
+  initDualSlider2(scarcityTrack,'scarcityFill','scarcityHandle1','scarcityHandle2','scarcityDisplay');
+  initDualSlider2(riskTrack,'riskFill','riskHandle1','riskHandle2','riskDisplay');
+});
+
+// 更简洁的双滑块初始化
+function initDualSlider2(track,fillId,h1Id,h2Id,displayId){
+  const fill=document.getElementById(fillId);
+  const h1=document.getElementById(h1Id);
+  const h2=document.getElementById(h2Id);
+  const display=document.getElementById(displayId);
+  let activeHandle=null;
+
+  function update(){
+    let v1=parseFloat(h1.style.left);
+    let v2=parseFloat(h2.style.left);
+    if(v1>v2){[v1,v2]=[v2,v1];}
+    fill.style.left=v1+'%';
+    fill.style.width=(v2-v1)+'%';
+    display.textContent=Math.round(v1)+' — '+Math.round(v2);
+  }
+  function onDrag(e){
+    if(!activeHandle) return;
+    e.preventDefault();
+    const clientX=e.clientX!==undefined?e.clientX:(e.touches&&e.touches[0].clientX);
+    const rect=track.getBoundingClientRect();
+    let pct=((clientX-rect.left)/rect.width)*100;
+    pct=Math.max(0,Math.min(100,pct));
+    if(activeHandle===h1){
+      pct=Math.min(pct,parseFloat(h2.style.left)-5);
+    }else{
+      pct=Math.max(pct,parseFloat(h1.style.left)+5);
+    }
+    activeHandle.style.left=pct+'%';
+    update();
+  }
+  function stopDrag(){
+    activeHandle=null;
+    document.removeEventListener('mousemove',onDrag);
+    document.removeEventListener('mouseup',stopDrag);
+    document.removeEventListener('touchmove',onDrag);
+    document.removeEventListener('touchend',stopDrag);
+  }
+  function startDrag(handle,e){
+    e.preventDefault();
+    activeHandle=handle;
+    document.addEventListener('mousemove',onDrag);
+    document.addEventListener('mouseup',stopDrag);
+    document.addEventListener('touchmove',onDrag,{passive:false});
+    document.addEventListener('touchend',stopDrag);
+  }
+  h1.addEventListener('mousedown',e=>startDrag(h1,e));
+  h2.addEventListener('mousedown',e=>startDrag(h2,e));
+  h1.addEventListener('touchstart',e=>startDrag(h1,e),{passive:false});
+  h2.addEventListener('touchstart',e=>startDrag(h2,e),{passive:false});
+}
+</script>
+</body>
+</html>
